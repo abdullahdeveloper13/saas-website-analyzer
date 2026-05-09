@@ -1,0 +1,13 @@
+-- Optional seed data for local demos.
+-- 1) Copy a user id from Authentication → Users in Supabase.
+-- 2) Optionally paste the full JSON from `src/data/demo-report-payload.json` as payload.
+
+-- Example (uncomment and edit USER_ID):
+-- insert into public.reports (user_id, url, title, overall_score, payload)
+-- values (
+--   '00000000-0000-0000-0000-000000000000'::uuid,
+--   'https://vercel.com',
+--   'vercel.com',
+--   86,
+--   '{"executiveSummary":"…","scores":{…},"sections":{…}}'::jsonb
+-- );

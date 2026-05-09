@@ -1,0 +1,79 @@
+{
+  "executiveSummary": "Sample payload for documentation and manual DB seeding. Scores are illustrative.",
+  "scores": {
+    "uiUx": 88,
+    "responsiveness": 84,
+    "accessibility": 81,
+    "seo": 86,
+    "performance": 83,
+    "colorUsage": 90,
+    "typography": 87,
+    "cta": 89
+  },
+  "sections": {
+    "uiUx": {
+      "score": 88,
+      "summary": "Clear hero hierarchy with a strong primary CTA; secondary actions could be quieter.",
+      "improvements": [
+        "Increase spacing between hero metrics for scanability.",
+        "Align illustration grid to an 8px baseline."
+      ]
+    },
+    "responsiveness": {
+      "score": 84,
+      "summary": "Likely stacks well, but dense tables may overflow on small phones.",
+      "improvements": [
+        "Test pricing table as horizontally scrollable with sticky first column.",
+        "Bump tap targets to at least 44px on mobile CTAs."
+      ]
+    },
+    "accessibility": {
+      "score": 81,
+      "summary": "Semantic headings appear reasonable; verify contrast on muted text.",
+      "improvements": [
+        "Audit focus rings on ghost buttons over imagery.",
+        "Ensure form errors are announced to screen readers."
+      ]
+    },
+    "seo": {
+      "score": 86,
+      "summary": "Title and H1 likely aligned; check meta descriptions for key landing pages.",
+      "improvements": [
+        "Add structured data for product and FAQ sections.",
+        "Consolidate duplicate H1 patterns on long-scroll pages."
+      ]
+    },
+    "performance": {
+      "score": 83,
+      "summary": "Hero media may dominate LCP; prioritize responsive images.",
+      "improvements": [
+        "Lazy-load below-the-fold carousels.",
+        "Preload the primary hero typeface subset."
+      ]
+    },
+    "colorUsage": {
+      "score": 90,
+      "summary": "Cohesive cool palette with disciplined accent usage.",
+      "improvements": [
+        "Reduce gradient noise behind body copy for readability.",
+        "Introduce a single warning color token for alerts."
+      ]
+    },
+    "typography": {
+      "score": 87,
+      "summary": "Readable scale; subheadings could use tighter tracking at large sizes.",
+      "improvements": [
+        "Cap line length at ~68 characters in blog sections.",
+        "Pair display headings with a calmer body face."
+      ]
+    },
+    "cta": {
+      "score": 89,
+      "summary": "Primary CTA is obvious; repeated CTAs are consistent.",
+      "improvements": [
+        "Add microcopy under the hero CTA to reduce uncertainty.",
+        "Surface a tertiary text link for security-conscious buyers."
+      ]
+    }
+  }
+}
