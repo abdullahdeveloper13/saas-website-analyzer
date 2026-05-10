@@ -86,11 +86,17 @@ export function PricingPageClient() {
   const autoStarted = useRef(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
+    try {
+      const supabase = createClient();
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setHasSession(!!session);
+        setSessionReady(true);
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Supabase client configuration error";
+      toast.error(msg);
       setSessionReady(true);
-    });
+    }
   }, []);
 
   const loginRedirect = useCallback((plan: "pro" | "team") => {
