@@ -8,7 +8,7 @@ Production-oriented Next.js 15 (App Router) SaaS starter: users submit a public 
 - Tailwind CSS v4 + shadcn/ui (Base UI primitives)
 - Supabase Auth (email/password + magic links) and Postgres
 - OpenAI GPT-4o-mini (JSON mode) with deterministic mock fallback
-- Framer Motion, Lucide, Recharts, jsPDF, Stripe Checkout + Customer Portal, next-themes
+- Framer Motion, Lucide, Recharts, jsPDF, Stripe Checkout + Customer Portal, next-themes 
 
 ## Quick start
 
