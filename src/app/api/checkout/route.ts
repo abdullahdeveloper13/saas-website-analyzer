@@ -3,10 +3,27 @@ import { createClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe";
 
 type PaidPlan = "pro" | "team";
+type BillingInterval = "monthly" | "annual";
 
-function priceIdForPlan(plan: PaidPlan): string | undefined {
-  if (plan === "team") return process.env.STRIPE_PRICE_TEAM ?? process.env.STRIPE_PRICE_PRO;
-  return process.env.STRIPE_PRICE_PRO;
+function priceIdForPlan(plan: PaidPlan, interval: BillingInterval): string | undefined {
+  if (interval === "annual") {
+    if (plan === "team") {
+      return (
+        process.env.STRIPE_PRICE_TEAM_ANNUAL ??
+        process.env.STRIPE_PRICE_TEAM_YEARLY ??
+        process.env.STRIPE_PRICE_TEAM ??
+        process.env.STRIPE_PRICE_PRO_ANNUAL ??
+        process.env.STRIPE_PRICE_PRO_YEARLY ??
+        process.env.STRIPE_PRICE_PRO
+      );
+    }
+    return process.env.STRIPE_PRICE_PRO_ANNUAL ?? process.env.STRIPE_PRICE_PRO_YEARLY ?? process.env.STRIPE_PRICE_PRO;
+  }
+
+  if (plan === "team") {
+    return process.env.STRIPE_PRICE_TEAM_MONTHLY ?? process.env.STRIPE_PRICE_TEAM ?? process.env.STRIPE_PRICE_PRO_MONTHLY ?? process.env.STRIPE_PRICE_PRO;
+  }
+  return process.env.STRIPE_PRICE_PRO_MONTHLY ?? process.env.STRIPE_PRICE_PRO;
 }
 
 function appOrigin(req: Request): string {
@@ -18,7 +35,7 @@ function appOrigin(req: Request): string {
 
 /**
  * POST /api/checkout
- * Body: `{ "plan": "pro" | "team" }`
+ * Body: `{ "plan": "pro" | "team", "interval"?: "monthly" | "annual" }`
  * Returns `{ "url": string }` for redirect to Stripe Checkout (subscription mode).
  */
 export async function POST(req: Request) {
@@ -36,17 +53,22 @@ export async function POST(req: Request) {
   }
 
   let plan: PaidPlan = "pro";
+  let interval: BillingInterval = "monthly";
   try {
-    const body = (await req.json()) as { plan?: string };
+    const body = (await req.json()) as { plan?: string; interval?: string };
     if (body.plan === "team" || body.plan === "pro") plan = body.plan;
+    if (body.interval === "monthly" || body.interval === "annual") interval = body.interval;
   } catch {
     /* default pro */
   }
 
-  const priceId = priceIdForPlan(plan);
+  const priceId = priceIdForPlan(plan, interval);
   if (!priceId) {
     return NextResponse.json(
-      { error: "Missing STRIPE_PRICE_PRO (and optionally STRIPE_PRICE_TEAM) in environment" },
+      {
+        error:
+          "Missing Stripe price IDs. Set STRIPE_PRICE_PRO_MONTHLY/ANNUAL and optionally STRIPE_PRICE_TEAM_MONTHLY/ANNUAL.",
+      },
       { status: 500 },
     );
   }
@@ -92,11 +114,13 @@ export async function POST(req: Request) {
       metadata: {
         supabase_user_id: user.id,
         plan,
+        interval,
       },
     },
     metadata: {
       supabase_user_id: user.id,
       plan,
+      interval,
     },
   });
 

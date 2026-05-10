@@ -8,25 +8,31 @@ import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
+type BillingInterval = "monthly" | "annual";
+type PaidPlan = "pro" | "team";
+
 type Tier = {
   name: string;
-  price: string;
+  monthlyPrice: string;
+  annualPrice: string;
   blurb: string;
   features: string[];
   cta: string;
   href: string;
   highlight: boolean;
   /** When set, logged-in users start Stripe Checkout for this plan */
-  checkoutPlan?: "pro" | "team";
+  checkoutPlan?: PaidPlan;
 };
 
 const tiers: Tier[] = [
   {
     name: "Starter",
-    price: "$0",
+    monthlyPrice: "$0",
+    annualPrice: "$0",
     blurb: "Prototype the workflow and share mock analyses.",
     features: ["3 saved reports / month", "Mock mode without OpenAI", "Dashboard history", "Clipboard export"],
     cta: "Create account",
@@ -35,8 +41,9 @@ const tiers: Tier[] = [
   },
   {
     name: "Pro",
-    price: "$24",
-    blurb: "For founders shipping weekly landing experiments.",
+    monthlyPrice: "$24",
+    annualPrice: "$240",
+    blurb: "For creators shipping landing-page improvements every week.",
     features: [
       "Unlimited analyses",
       "GPT-4o-mini structured JSON",
@@ -50,22 +57,23 @@ const tiers: Tier[] = [
     checkoutPlan: "pro",
   },
   {
-    name: "Team",
-    price: "$59",
-    blurb: "Shared history with admin insights (structure included).",
-    features: ["Everything in Pro", "Admin panel scaffold", "Priority roadmap slots", "Shared workspace (coming soon)"],
-    cta: "Start Team",
+    name: "Express",
+    monthlyPrice: "$59",
+    annualPrice: "$590",
+    blurb: "For small teams that need faster insights and premium support.",
+    features: ["Everything in Pro", "Priority support", "Admin panel scaffold", "Shared workspace (coming soon)"],
+    cta: "Start Express",
     href: "/login",
     highlight: false,
     checkoutPlan: "team",
   },
 ];
 
-async function startCheckout(plan: "pro" | "team") {
+async function startCheckout(plan: PaidPlan, interval: BillingInterval) {
   const res = await fetch("/api/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify({ plan, interval }),
   });
   const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
   if (!res.ok) {
@@ -82,7 +90,8 @@ export function PricingPageClient() {
   const searchParams = useSearchParams();
   const [sessionReady, setSessionReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
-  const [loadingPlan, setLoadingPlan] = useState<"pro" | "team" | null>(null);
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
+  const [loadingPlan, setLoadingPlan] = useState<PaidPlan | null>(null);
   const autoStarted = useRef(false);
 
   useEffect(() => {
@@ -99,40 +108,43 @@ export function PricingPageClient() {
     }
   }, []);
 
-  const loginRedirect = useCallback((plan: "pro" | "team") => {
-    const next = `/pricing?plan=${plan}`;
+  const loginRedirect = useCallback((plan: PaidPlan, billingInterval: BillingInterval) => {
+    const next = `/pricing?plan=${plan}&interval=${billingInterval}`;
     return `/login?redirect=${encodeURIComponent(next)}`;
   }, []);
 
   const handlePaidTier = useCallback(
-    async (plan: "pro" | "team") => {
+    async (plan: PaidPlan) => {
       if (!hasSession) {
-        router.push(loginRedirect(plan));
+        router.push(loginRedirect(plan, interval));
         return;
       }
       setLoadingPlan(plan);
       try {
-        await startCheckout(plan);
+        await startCheckout(plan, interval);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Checkout failed";
         toast.error(msg);
         setLoadingPlan(null);
       }
     },
-    [hasSession, loginRedirect, router],
+    [hasSession, interval, loginRedirect, router],
   );
 
   // After login, ?plan=pro|team triggers checkout once
   useEffect(() => {
     if (!sessionReady || !hasSession) return;
     const plan = searchParams.get("plan");
+    const intervalParam = searchParams.get("interval");
     if (plan !== "pro" && plan !== "team") return;
+    const selectedInterval: BillingInterval = intervalParam === "annual" ? "annual" : "monthly";
+    setInterval(selectedInterval);
     if (autoStarted.current) return;
     autoStarted.current = true;
     void (async () => {
       setLoadingPlan(plan);
       try {
-        await startCheckout(plan);
+        await startCheckout(plan, selectedInterval);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Checkout failed";
         toast.error(msg);
@@ -151,9 +163,18 @@ export function PricingPageClient() {
       >
         <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Simple, transparent pricing</h1>
         <p className="mt-4 text-muted-foreground">
-          Paid plans use Stripe Checkout. Add price IDs to your environment, then subscribe in one click while signed in.
+          Choose monthly or annual billing, then start your subscription in Stripe Checkout.
         </p>
       </motion.div>
+
+      <div className="mt-8 flex justify-center">
+        <Tabs value={interval} onValueChange={(v) => setInterval(v as BillingInterval)}>
+          <TabsList>
+            <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            <TabsTrigger value="annual">Annual</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
       <div className="mt-14 grid gap-6 lg:grid-cols-3">
         {tiers.map((t, i) => (
@@ -180,9 +201,15 @@ export function PricingPageClient() {
               </div>
               <p className="mt-2 text-sm text-muted-foreground">{t.blurb}</p>
               <p className="mt-6 text-4xl font-semibold tabular-nums">
-                {t.price}
-                <span className="text-base font-normal text-muted-foreground"> / mo</span>
+                {interval === "annual" ? t.annualPrice : t.monthlyPrice}
+                <span className="text-base font-normal text-muted-foreground">
+                  {" "}
+                  / {interval === "annual" ? "yr" : "mo"}
+                </span>
               </p>
+              {interval === "annual" && t.checkoutPlan ? (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">Save about 2 months vs monthly billing</p>
+              ) : null}
               <ul className="mt-6 flex-1 space-y-3 text-sm">
                 {t.features.map((f) => (
                   <li key={f} className="flex gap-2">
