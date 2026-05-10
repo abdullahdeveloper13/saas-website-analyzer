@@ -5,6 +5,17 @@ import { getStripe } from "@/lib/stripe";
 type PaidPlan = "pro" | "team";
 type BillingInterval = "monthly" | "annual";
 
+const checkoutPrices: Record<PaidPlan, Record<BillingInterval, { name: string; unitAmount: number }>> = {
+  pro: {
+    monthly: { name: "Pro", unitAmount: 2400 },
+    annual: { name: "Pro", unitAmount: 24000 },
+  },
+  team: {
+    monthly: { name: "Express", unitAmount: 5900 },
+    annual: { name: "Express", unitAmount: 59000 },
+  },
+};
+
 function priceIdForPlan(plan: PaidPlan, interval: BillingInterval): string | undefined {
   if (interval === "annual") {
     if (plan === "team") {
@@ -26,11 +37,38 @@ function priceIdForPlan(plan: PaidPlan, interval: BillingInterval): string | und
   return process.env.STRIPE_PRICE_PRO_MONTHLY ?? process.env.STRIPE_PRICE_PRO;
 }
 
+function checkoutLineItem(plan: PaidPlan, interval: BillingInterval) {
+  const price = priceIdForPlan(plan, interval);
+  if (price) {
+    return { price, quantity: 1 };
+  }
+
+  const fallbackPrice = checkoutPrices[plan][interval];
+  const recurringInterval = interval === "annual" ? "year" : "month";
+  return {
+    price_data: {
+      currency: "usd" as const,
+      product_data: {
+        name: `${fallbackPrice.name} subscription`,
+      },
+      recurring: {
+        interval: recurringInterval as "month" | "year",
+      },
+      unit_amount: fallbackPrice.unitAmount,
+    },
+    quantity: 1,
+  };
+}
+
 function appOrigin(req: Request): string {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
     new URL(req.url).origin
   );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Checkout failed";
 }
 
 /**
@@ -62,17 +100,6 @@ export async function POST(req: Request) {
     /* default pro */
   }
 
-  const priceId = priceIdForPlan(plan, interval);
-  if (!priceId) {
-    return NextResponse.json(
-      {
-        error:
-          "Missing Stripe price IDs. Set STRIPE_PRICE_PRO_MONTHLY/ANNUAL and optionally STRIPE_PRICE_TEAM_MONTHLY/ANNUAL.",
-      },
-      { status: 500 },
-    );
-  }
-
   const origin = appOrigin(req);
 
   const { data: existing } = await supabase
@@ -83,11 +110,17 @@ export async function POST(req: Request) {
 
   let customerId = existing?.stripe_customer_id ?? null;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email ?? undefined,
-      metadata: { supabase_user_id: user.id },
-    });
-    customerId = customer.id;
+    try {
+      const customer = await stripe.customers.create({
+        email: user.email ?? undefined,
+        metadata: { supabase_user_id: user.id },
+      });
+      customerId = customer.id;
+    } catch (error) {
+      console.error("[checkout] customer create failed", error);
+      return NextResponse.json({ error: errorMessage(error) }, { status: 502 });
+    }
+
     const { error: upsertErr } = await supabase.from("subscriptions").upsert(
       {
         user_id: user.id,
@@ -103,26 +136,32 @@ export async function POST(req: Request) {
     }
   }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/dashboard/settings?checkout=success`,
-    cancel_url: `${origin}/pricing?checkout=cancel`,
-    client_reference_id: user.id,
-    subscription_data: {
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: [checkoutLineItem(plan, interval)],
+      success_url: `${origin}/dashboard/settings?checkout=success`,
+      cancel_url: `${origin}/dashboard/settings?checkout=cancel`,
+      client_reference_id: user.id,
+      subscription_data: {
+        metadata: {
+          supabase_user_id: user.id,
+          plan,
+          interval,
+        },
+      },
       metadata: {
         supabase_user_id: user.id,
         plan,
         interval,
       },
-    },
-    metadata: {
-      supabase_user_id: user.id,
-      plan,
-      interval,
-    },
-  });
+    });
+  } catch (error) {
+    console.error("[checkout] session create failed", error);
+    return NextResponse.json({ error: errorMessage(error) }, { status: 502 });
+  }
 
   if (!session.url) {
     return NextResponse.json({ error: "Stripe did not return a checkout URL" }, { status: 500 });

@@ -105,7 +105,7 @@ export function DashboardShell({
         <header className="flex h-14 items-center justify-between border-b border-border/70 bg-background/80 px-4 backdrop-blur-md md:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
-              nativeButton={false}
+              nativeButton
               render={
                 <Button variant="outline" size="icon-sm" aria-label="Open navigation">
                   <Menu className="size-4" />
