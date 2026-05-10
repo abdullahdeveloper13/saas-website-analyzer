@@ -16,7 +16,12 @@ export function AnalyzePanel() {
   useEffect(() => {
     if (!state) return;
     if (!state.ok) toast.error(state.message);
-    else toast.success("Analysis complete — saved to your workspace.");
+    else if (state.saved) toast.success("Analysis complete — saved to your workspace.");
+    else {
+      toast.warning(
+        "Analysis complete, but your reports table is missing. Run supabase/schema.sql to enable saving history.",
+      );
+    }
   }, [state]);
 
   return (

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { AnalysisPayload } from "@/types/analysis";
 
 export type AnalyzeState =
-  | { ok: true; reportId: string; payload: AnalysisPayload; overall: number; url: string }
+  | { ok: true; reportId: string | null; payload: AnalysisPayload; overall: number; url: string; saved: boolean }
   | { ok: false; message: string };
 
 /**
@@ -50,6 +50,23 @@ export async function analyzeWebsite(
     .single();
 
   if (error) {
+    const missingReportsTable =
+      error.code === "PGRST205" ||
+      /public\.reports/i.test(error.message) ||
+      /schema cache/i.test(error.message) ||
+      /Could not find the table/i.test(error.message);
+
+    if (missingReportsTable) {
+      return {
+        ok: true,
+        reportId: null,
+        payload: result.payload,
+        overall: result.overall,
+        url: result.normalizedUrl,
+        saved: false,
+      };
+    }
+
     return {
       ok: false,
       message:
@@ -67,5 +84,6 @@ export async function analyzeWebsite(
     payload: result.payload,
     overall: result.overall,
     url: result.normalizedUrl,
+    saved: true,
   };
 }
